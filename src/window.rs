@@ -11,7 +11,7 @@ pub struct AppConfig {
 }
 
 // Handle events related to the window and update the model if necessary
-fn event(_app: &App, _model: &mut AppConfig, event: WindowEvent) {
+fn event(_app: &App, _model: &mut AppConfig, _event: WindowEvent) {
     // println!("{:?}", event);
 }
 
@@ -20,11 +20,32 @@ fn view(app: &App, model: &AppConfig, frame: Frame) {
     let draw = app.draw();
 
     frame.clear(WHITE);
-    draw.line()
-        .weight(8.0)
-        .color(BLACK)
-        .caps_round()
-        .points(model.links[0].x, model.links[1].x);
+
+    // Current problem is can't use peek when inside for
+    // Split out iterator out and use next()/peek() separately.
+
+    let mut link_iter = model.links.iter().peekable();
+
+    while let Some((start, end)) = link_iter.next().zip(link_iter.peek()){
+        match start {
+        Link::RootRevolute { x: sx, theta: _, omega: _ } => {
+            match end {
+                Link::Revolute { x: ex, theta: _, omega: _, length: _ } => {
+                    draw.line()
+                        .weight(8.0)
+                        .color(BLACK)
+                        .caps_round()
+                        .points(*sx, *ex);
+                },
+
+                // Should not have more than one root (handles Root_ arms of enum)             
+                _ => unimplemented!(), 
+            }
+        },
+        
+        _ => panic!("Should not start non-root.")
+        }
+    }
 
     draw.to_frame(app, &frame).unwrap();
 
@@ -48,17 +69,15 @@ pub fn init(app: &App) -> AppConfig {
     AppConfig {
         window: _window,
         links: vec![
-            Link { x: vec2(0.0, 0.0) },
-            Link {
-                x: vec2(100.0, 0.0),
-            },
+            Link::RootRevolute { x: vec2(0.0, 0.0), omega: 0.0, theta: 0.0 },
+            Link::Revolute { x: vec2(100.0, 0.0), omega: 0.0, theta: 0.0, length: 100.0 }
         ],
         angle: 0.0,
         egui: egui,
     }
 }
 
-pub fn update(app: &App, model: &mut AppConfig, update: Update) {
+pub fn update(_app: &App, model: &mut AppConfig, update: Update) {
     let egui = &mut model.egui;
 
     egui.set_elapsed_time(update.since_start);
@@ -66,19 +85,33 @@ pub fn update(app: &App, model: &mut AppConfig, update: Update) {
 
     egui::Window::new("Settings").show(&ctx, |ui| {
         // Resolution slider
-        ui.label(format!("Angle: {:.3}", model.angle));
+        for (i, link) in model.links.iter_mut().enumerate().skip(1) {
+            ui.label("JOINT ANGLES");
+            ui.label(format!("Angle of joint #{} [\u{0424}]: {:.3}", i, model.angle));
+
+            match link {
+                Link::Revolute { x, theta, omega, length } => {
+                    ui.add(egui::Slider::new(theta, 0.0..=(2.0 * PI)));
+                },
+                
+                
+                _ => todo!(),
+            }
+        }
     });
 
-    model.angle += 0.01;
-    let end = model.links.get_mut(1).expect("Does not have a 2nd element");
+    for link in model.links.iter_mut().skip(1) {
+        match link {
+            Link::Revolute { x, theta, omega: _, length } => {
+                x.x = f32::cos(*theta) * *length;
+                x.y = f32::sin(*theta) * *length;
+                println!("Updated joint with values {}, {}",f32::cos(*theta) * *length, f32::sin(*theta) * *length)
+            },
 
-    end.x.x = f32::cos(model.angle) * 100.0;
-    end.x.y = f32::sin(model.angle) * 100.0;
+            _ => panic!("Updating values of root link.")
+        }
 
-    println!(
-        "Current cs values: {}, {:#?}",
-        model.angle, model.links[1].x
-    );
+    }
 }
 
 fn raw_window_event(_app: &App, model: &mut AppConfig, event: &nannou::winit::event::WindowEvent) {
