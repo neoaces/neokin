@@ -3,6 +3,14 @@ name = "neokin"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "neolib"
+path = "lib/lib.rs"
+
+[[bin]]
+name = "neokin"
+path = "src/main.rs"
+
 [dependencies]
 egui = "0.30.0"
 nannou = "0.19.0"

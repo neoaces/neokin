@@ -1,10 +1,5 @@
-use nannou::prelude::*;
-pub mod links;
-pub mod window;
+use neolib::window;
 
 fn main() {
-    nannou::app(window::init)
-        .update(window::update)
-        .loop_mode(LoopMode::RefreshSync)
-        .run();
+    window::run();
 }
