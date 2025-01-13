@@ -1,5 +1,3 @@
-use neolib::window;
-
 fn main() {
-    window::run();
+    neolib::window::run();
 }
