@@ -1,6 +1,6 @@
+use crate::links::Link;
 use nannou::prelude::*;
 use nannou_egui::{self, egui, Egui};
-use crate::links::Link;
 
 #[allow(dead_code)]
 pub struct AppConfig {
@@ -20,12 +20,14 @@ pub fn view(app: &App, model: &AppConfig, frame: Frame) {
     frame.clear(WHITE);
 
     let mut link_iter = model.links.iter().peekable();
+    let mut last_x: Vec2 = Vec2::default();
 
     while let Some((start, end)) = link_iter.next().zip(link_iter.peek()) {
         match start {
+            // 1. At beginning of robot.
             Link::RootRevolute {
                 x: sx,
-                theta: _,
+                theta,
                 omega: _,
             } => {
                 match end {
@@ -40,6 +42,8 @@ pub fn view(app: &App, model: &AppConfig, frame: Frame) {
                             .color(BLACK)
                             .caps_round()
                             .points(*sx, *ex);
+
+                        last_x = *sx;
                     }
 
                     // Should not have more than one root (handles Root_ arms of enum)
@@ -47,7 +51,33 @@ pub fn view(app: &App, model: &AppConfig, frame: Frame) {
                 }
             }
 
-            _ => panic!("Should not start non-root."),
+            // 2. Render a non-starting link
+            Link::Revolute {
+                x: sx,
+                theta,
+                omega: _,
+                length: _,
+            } => {
+                match end {
+                    Link::Revolute {
+                        x: ex,
+                        theta: _,
+                        omega: _,
+                        length: _,
+                    } => {
+                        draw.line()
+                            .weight(8.0)
+                            .color(BLACK)
+                            .caps_round()
+                            .points(*sx + last_x, *ex);
+
+                        last_x = *sx;
+                    }
+
+                    // Should not have more than one root (handles Root_ arms of enum)
+                    _ => panic!("Robot has more than one root."),
+                }
+            }
         }
     }
 
@@ -83,6 +113,12 @@ pub fn init(app: &App) -> AppConfig {
                 omega: 0.0,
                 theta: 0.0,
                 length: 100.0,
+            },
+            Link::Revolute {
+                x: vec2(0.0, 50.0),
+                omega: 0.0,
+                theta: 0.0,
+                length: 50.0,
             },
         ],
         angle: 0.0,
@@ -120,7 +156,10 @@ pub fn update(_app: &App, model: &mut AppConfig, update: Update) {
         }
     });
 
-    for link in model.links.iter_mut().skip(1) {
+    let mut sum_theta: f32 = 0.0;
+    let mut last_x: Vec2 = Vec2::default();
+
+    for link in model.links.iter_mut() {
         match link {
             Link::Revolute {
                 x,
@@ -128,16 +167,18 @@ pub fn update(_app: &App, model: &mut AppConfig, update: Update) {
                 omega: _,
                 length,
             } => {
-                x.x = f32::cos(*theta) * *length;
-                x.y = f32::sin(*theta) * *length;
-                println!(
-                    "Updated joint with values {}, {}",
-                    f32::cos(*theta) * *length,
-                    f32::sin(*theta) * *length
-                )
+                x.x = f32::cos(*theta + sum_theta) * *length + last_x.x;
+                x.y = f32::sin(*theta + sum_theta) * *length + last_x.y;
+
+                sum_theta += *theta;
+                last_x = *x;
             }
 
-            _ => panic!("Updating values of root link."),
+            Link::RootRevolute {
+                x,
+                theta: _,
+                omega: _,
+            } => last_x = *x,
         }
     }
 }
