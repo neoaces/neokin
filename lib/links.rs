@@ -12,7 +12,6 @@ pub struct JointState {
     pub x: Vec2
 }
 
-// TODO: Define proc_macro for JointType
 /// All joints must define JointType.
 pub trait JointType: Debug {
     fn get_name(&self) -> String;

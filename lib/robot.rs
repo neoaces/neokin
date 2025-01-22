@@ -6,10 +6,13 @@ use std::fmt::Debug;
 /// The current configuration of the robot.
 ///
 /// At any point, the robot MUST have the same number of links and joints. 
+/// Note that the main processing of position is in JointType; the Links
+/// are solely used to hold the distance between two joints, and other 
+/// physical constants (inertia, COM).
 ///
-/// * `origin`: 
-/// * `joints`: 
-/// * `links`: 
+/// * `origin`: The origin of the arm
+/// * `joints`: Vector of joints
+/// * `links`: Vector of links
 pub struct RobotConfiguration {
     pub origin: Vec2,
     pub joints: Vec<Box<dyn JointType>>,
